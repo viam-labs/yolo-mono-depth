@@ -2,5 +2,6 @@ viam-sdk>=0.30.0
 numpy>=1.24
 Pillow>=10.0
 typing_extensions>=4.0
-# Ultralytics YOLO26 depth (required when this module is used)
+# Ultralytics pulls torch (+ often CUDA on Linux aarch64). On a Pi, run.sh
+# installs CPU torch/torchvision first; for a manual venv see README.
 ultralytics>=8.3

@@ -41,7 +41,16 @@ Model: `viam-labs:yolo-mono-depth:camera` (`rdk:component:camera`).
 | `shm_name` | Optional POSIX shm writer (nav-stack / `viam-shared-memory-test` layout) |
 | `fx`/`fy`/`cx`/`cy` | Intrinsics; or omit and use `hfov_deg` (default `70`) |
 
-On a Raspberry Pi, export NCNN and set `"backend": "ncnn"` with `"model"` pointing at the export directory.
+On a Raspberry Pi, export NCNN on a desktop, copy the `*_ncnn_model` dir to the Pi, and set `"backend": "ncnn"` with `"model"` pointing at that directory. Prefer NCNN over `.pt` on ARM.
+
+`run.sh` installs **CPU** PyTorch on Linux `aarch64` before Ultralytics so pip does not pull CUDA/`nvidia-cudnn` wheels (useless on a Pi). If a previous install already dragged those in, remove `viam-env/` and `.installed` and let the module reinstall.
+
+Manual Pi venv (same order):
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
 
 Point cloud frame is ROS camera_link style (**X forward**, Y left, Z up). Configure the SLAM lidar `mount` accordingly.
 
