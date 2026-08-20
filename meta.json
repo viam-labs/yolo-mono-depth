@@ -1,0 +1,15 @@
+{
+  "module_id": "viam-labs:yolo-mono-depth",
+  "visibility": "public",
+  "url": "https://github.com/viam-labs/yolo-mono-depth",
+  "description": "Monocular YOLO26 depth from an RGB camera, published as a point-cloud lidar (optional shm + online scale).",
+  "models": [
+    {
+      "api": "rdk:component:camera",
+      "model": "viam-labs:yolo-mono-depth:camera",
+      "markdown_link": "README.md#configure",
+      "short_description": "Ultralytics YOLO26 monocular depth → PCD lidar"
+    }
+  ],
+  "entrypoint": "run.sh"
+}

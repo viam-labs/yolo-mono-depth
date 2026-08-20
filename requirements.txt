@@ -1,0 +1,6 @@
+viam-sdk>=0.30.0
+numpy>=1.24
+Pillow>=10.0
+typing_extensions>=4.0
+# Ultralytics YOLO26 depth (required when this module is used)
+ultralytics>=8.3
