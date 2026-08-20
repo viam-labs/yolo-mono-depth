@@ -73,6 +73,8 @@ def test_ensure_ncnn_exports_when_missing(tmp_path):
     pt = tmp_path / "yolo26n-depth.pt"
     pt.write_bytes(b"fake")
     out = ncnn_dir_for_pt(pt)
+    # Name alone must not skip export when the directory is absent.
+    assert not out.exists()
 
     class _YOLO:
         def __init__(self, path):

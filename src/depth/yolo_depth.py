@@ -59,18 +59,24 @@ def _ensure_lzma_importable() -> None:
 
 
 def looks_like_ncnn(model: str) -> bool:
-    """True when ``model`` is an NCNN export dir (or path that should use NCNN)."""
+    """True when ``model`` names or is an NCNN export dir (may not exist yet)."""
     p = Path(str(model)).expanduser()
     name = p.name
     if name.endswith("_ncnn_model") or name.endswith(".ncnn"):
         return True
-    if p.is_dir():
-        if (p / "model.ncnn.param").is_file() or (p / "model.param").is_file():
+    return ncnn_export_ready(p)
+
+
+def ncnn_export_ready(model: str | Path) -> bool:
+    """True when ``model`` is an existing directory with NCNN param weights."""
+    p = Path(str(model)).expanduser()
+    if not p.is_dir():
+        return False
+    if (p / "model.ncnn.param").is_file() or (p / "model.param").is_file():
+        return True
+    for child in p.iterdir():
+        if child.suffix == ".param" or child.name.endswith(".ncnn.param"):
             return True
-        # Ultralytics export layout: <stem>_ncnn_model/
-        for child in p.iterdir():
-            if child.suffix == ".param" or child.name.endswith(".ncnn.param"):
-                return True
     return False
 
 
@@ -99,8 +105,8 @@ def ensure_ncnn_model(pt_path: str, *, imgsz: int, yolo_cls: Any = None) -> str:
     """
     pt = Path(str(pt_path)).expanduser()
     out = ncnn_dir_for_pt(pt)
-    if looks_like_ncnn(str(out)):
-        return str(out.resolve() if out.exists() else out)
+    if ncnn_export_ready(out):
+        return str(out.resolve())
 
     if yolo_cls is None:
         from ultralytics import YOLO as yolo_cls  # type: ignore
@@ -117,10 +123,9 @@ def ensure_ncnn_model(pt_path: str, *, imgsz: int, yolo_cls: Any = None) -> str:
     candidate = Path(str(exported)).expanduser() if exported else out
     if candidate.is_file() and candidate.suffix == ".zip":
         candidate = candidate.with_suffix("")
-    if looks_like_ncnn(str(candidate)):
-        return str(candidate.resolve() if candidate.exists() else candidate)
-    if looks_like_ncnn(str(out)):
-        return str(out.resolve() if out.exists() else out)
+    for path in (candidate, out):
+        if ncnn_export_ready(path):
+            return str(path.resolve())
     raise YoloDepthError(
         f"NCNN export of {pt!s} did not produce a usable model dir "
         f"(tried {candidate!s} and {out!s})"
