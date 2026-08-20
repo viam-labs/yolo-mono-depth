@@ -19,8 +19,9 @@ from typing_extensions import Self
 from viam.components.camera import Camera
 from viam.components.movement_sensor import MovementSensor
 from viam.logging import getLogger
+from viam.media.video import CameraMimeType, NamedImage
 from viam.proto.app.robot import ComponentConfig
-from viam.proto.common import ResourceName
+from viam.proto.common import ResourceName, ResponseMetadata
 from viam.resource.base import ResourceBase
 from viam.resource.types import Model, ModelFamily
 from viam.utils import struct_to_dict
@@ -57,6 +58,19 @@ def _rgb_from_viam_image(image) -> np.ndarray:
     return np.asarray(pil.convert("RGB"), dtype=np.uint8)
 
 
+def _rgb_to_jpeg(rgb: np.ndarray, *, quality: int = 85) -> bytes:
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.fromarray(np.asarray(rgb, dtype=np.uint8), mode="RGB").save(
+        buf, format="JPEG", quality=int(quality)
+    )
+    return buf.getvalue()
+
+
+COLOR_SOURCE_NAME = "color"
+
+
 class MonoDepth(Camera):
     MODEL: ClassVar[Model] = Model(ModelFamily("viam-labs", "yolo-mono-depth"), "camera")
 
@@ -77,6 +91,7 @@ class MonoDepth(Camera):
         self._lock = threading.Lock()
         self._write_lock = threading.Lock()
         self._latest = b""
+        self._latest_jpeg = b""
         self._latest_points: Optional[np.ndarray] = None
         self._produce_hz = 10.0
         self._timeout_s = 2.0
@@ -346,6 +361,7 @@ class MonoDepth(Camera):
                 )
 
         pcd = pcd_util.points_to_pcd(points)
+        jpeg = _rgb_to_jpeg(rgb)
         with self._write_lock:
             shm = self._shm
             if shm is not None and not self._stop.is_set():
@@ -362,6 +378,7 @@ class MonoDepth(Camera):
                 )
         with self._lock:
             self._latest = pcd
+            self._latest_jpeg = jpeg
             self._latest_points = points
         self._frames += 1
         self._last_points = int(points.shape[0])
@@ -372,35 +389,58 @@ class MonoDepth(Camera):
         self._last_publish_wall = now
         self._last_error = None
 
-    async def get_images(self, *, extra=None, timeout=None, **kwargs):
-        raise NotImplementedError(
-            "yolo-mono-depth does not support get_images; use get_point_cloud"
-        )
-
-    async def get_point_cloud(
-        self, *, extra=None, timeout: Optional[float] = None, **kwargs
-    ) -> tuple[bytes, str]:
-        self._ensure_producer()
+    async def _wait_for_frame(self, timeout: Optional[float]) -> tuple[bytes, bytes]:
+        """Return ``(pcd, jpeg)`` once a frame is available, or raise."""
         wait_s = float(timeout) if timeout is not None else self._timeout_s
         deadline = time.monotonic() + wait_s
         while time.monotonic() < deadline:
             with self._lock:
                 pcd = self._latest
-            if pcd:
-                return pcd, "pointcloud/pcd"
+                jpeg = self._latest_jpeg
+            if pcd and jpeg:
+                return pcd, jpeg
             if self._produce_hz > 0:
                 await asyncio.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
                 continue
             await self._publish_once_async()
             with self._lock:
                 pcd = self._latest
-            if pcd:
-                return pcd, "pointcloud/pcd"
+                jpeg = self._latest_jpeg
+            if pcd and jpeg:
+                return pcd, jpeg
             break
         raise RuntimeError("yolo-mono-depth has no frame yet")
 
+    async def get_images(
+        self,
+        *,
+        filter_source_names: Optional[Sequence[str]] = None,
+        extra=None,
+        timeout: Optional[float] = None,
+        **kwargs,
+    ):
+        self._ensure_producer()
+        _pcd, jpeg = await self._wait_for_frame(timeout)
+        want = None
+        if filter_source_names:
+            want = {str(n).strip().lower() for n in filter_source_names if str(n).strip()}
+        images: list[NamedImage] = []
+        if want is None or COLOR_SOURCE_NAME in want or "rgb" in want:
+            images.append(NamedImage(COLOR_SOURCE_NAME, jpeg, CameraMimeType.JPEG))
+        return images, ResponseMetadata()
+
+    async def get_point_cloud(
+        self, *, extra=None, timeout: Optional[float] = None, **kwargs
+    ) -> tuple[bytes, str]:
+        self._ensure_producer()
+        pcd, _jpeg = await self._wait_for_frame(timeout)
+        return pcd, CameraMimeType.PCD
+
     async def get_properties(self, *, timeout=None, **kwargs) -> Camera.Properties:
-        return Camera.Properties(supports_pcd=True, mime_types=["pointcloud/pcd"])
+        return Camera.Properties(
+            supports_pcd=True,
+            mime_types=[CameraMimeType.JPEG, CameraMimeType.PCD],
+        )
 
     async def do_command(
         self, command: Mapping[str, object], *, timeout: Optional[float] = None, **kwargs

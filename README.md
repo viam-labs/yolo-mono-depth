@@ -54,6 +54,8 @@ pip install -r requirements.txt
 
 Point cloud frame is ROS camera_link style (**X forward**, Y left, Z up). Configure the SLAM lidar `mount` accordingly.
 
+`GetImages` returns the latest RGB frame as source name `color` (`image/jpeg`), kept in sync with the point cloud from `GetPointCloud`.
+
 Camera DoCommand returns `scale`, `last_infer_ms`, `last_grab_ms`, `measured_hz`, frame counts; `set_scale` overrides the multiplier.
 
 ## Develop

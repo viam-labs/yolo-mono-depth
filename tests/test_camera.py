@@ -170,6 +170,15 @@ async def test_mono_depth_publishes_pcd_and_shm():
         assert mime == "pointcloud/pcd"
         assert len(pcd) > 100
         assert cam._last_points > 0
+        images, _meta = await cam.get_images(timeout=1.0)
+        assert len(images) == 1
+        assert images[0].name == "color"
+        assert images[0].mime_type == "image/jpeg"
+        assert images[0].data[:2] == b"\xff\xd8"
+        filtered, _ = await cam.get_images(filter_source_names=["color"], timeout=1.0)
+        assert len(filtered) == 1
+        empty, _ = await cam.get_images(filter_source_names=["depth"], timeout=1.0)
+        assert empty == []
         pts = pcd_util.parse_pcd(pcd)
         assert pts.shape[0] == cam._last_points
         with pcshm.open_reader(shm_name, pcshm.DEFAULT_REGION_SIZE) as reader:
