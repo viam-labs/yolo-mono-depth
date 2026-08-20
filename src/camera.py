@@ -27,6 +27,7 @@ from viam.resource.types import Model, ModelFamily
 from viam.utils import struct_to_dict
 
 from .depth.backproject import depth_to_points, resolve_intrinsics
+from .depth.colormap import depth_to_color_rgb
 from .depth.scale_estimator import ScaleEstimator, ScaleEstimatorConfig
 from .depth.yolo_depth import YoloDepthEstimator
 from .util import pcshm
@@ -69,6 +70,7 @@ def _rgb_to_jpeg(rgb: np.ndarray, *, quality: int = 85) -> bytes:
 
 
 COLOR_SOURCE_NAME = "color"
+DEPTH_SOURCE_NAME = "depth"
 
 
 class MonoDepth(Camera):
@@ -92,6 +94,7 @@ class MonoDepth(Camera):
         self._write_lock = threading.Lock()
         self._latest = b""
         self._latest_jpeg = b""
+        self._latest_depth_jpeg = b""
         self._latest_points: Optional[np.ndarray] = None
         self._produce_hz = 10.0
         self._timeout_s = 2.0
@@ -361,7 +364,14 @@ class MonoDepth(Camera):
                 )
 
         pcd = pcd_util.points_to_pcd(points)
-        jpeg = _rgb_to_jpeg(rgb)
+        color_jpeg = _rgb_to_jpeg(rgb)
+        depth_viz = depth_to_color_rgb(
+            depth,
+            scale=self._scale_est.scale,
+            min_depth_m=self._min_depth_m,
+            max_depth_m=self._max_depth_m,
+        )
+        depth_jpeg = _rgb_to_jpeg(depth_viz)
         with self._write_lock:
             shm = self._shm
             if shm is not None and not self._stop.is_set():
@@ -378,7 +388,8 @@ class MonoDepth(Camera):
                 )
         with self._lock:
             self._latest = pcd
-            self._latest_jpeg = jpeg
+            self._latest_jpeg = color_jpeg
+            self._latest_depth_jpeg = depth_jpeg
             self._latest_points = points
         self._frames += 1
         self._last_points = int(points.shape[0])
@@ -389,25 +400,29 @@ class MonoDepth(Camera):
         self._last_publish_wall = now
         self._last_error = None
 
-    async def _wait_for_frame(self, timeout: Optional[float]) -> tuple[bytes, bytes]:
-        """Return ``(pcd, jpeg)`` once a frame is available, or raise."""
+    async def _wait_for_frame(
+        self, timeout: Optional[float]
+    ) -> tuple[bytes, bytes, bytes]:
+        """Return ``(pcd, color_jpeg, depth_jpeg)`` once a frame is available."""
         wait_s = float(timeout) if timeout is not None else self._timeout_s
         deadline = time.monotonic() + wait_s
         while time.monotonic() < deadline:
             with self._lock:
                 pcd = self._latest
-                jpeg = self._latest_jpeg
-            if pcd and jpeg:
-                return pcd, jpeg
+                color = self._latest_jpeg
+                depth = self._latest_depth_jpeg
+            if pcd and color and depth:
+                return pcd, color, depth
             if self._produce_hz > 0:
                 await asyncio.sleep(min(0.05, max(0.0, deadline - time.monotonic())))
                 continue
             await self._publish_once_async()
             with self._lock:
                 pcd = self._latest
-                jpeg = self._latest_jpeg
-            if pcd and jpeg:
-                return pcd, jpeg
+                color = self._latest_jpeg
+                depth = self._latest_depth_jpeg
+            if pcd and color and depth:
+                return pcd, color, depth
             break
         raise RuntimeError("yolo-mono-depth has no frame yet")
 
@@ -420,20 +435,22 @@ class MonoDepth(Camera):
         **kwargs,
     ):
         self._ensure_producer()
-        _pcd, jpeg = await self._wait_for_frame(timeout)
+        _pcd, color_jpeg, depth_jpeg = await self._wait_for_frame(timeout)
         want = None
         if filter_source_names:
             want = {str(n).strip().lower() for n in filter_source_names if str(n).strip()}
         images: list[NamedImage] = []
         if want is None or COLOR_SOURCE_NAME in want or "rgb" in want:
-            images.append(NamedImage(COLOR_SOURCE_NAME, jpeg, CameraMimeType.JPEG))
+            images.append(NamedImage(COLOR_SOURCE_NAME, color_jpeg, CameraMimeType.JPEG))
+        if want is None or DEPTH_SOURCE_NAME in want:
+            images.append(NamedImage(DEPTH_SOURCE_NAME, depth_jpeg, CameraMimeType.JPEG))
         return images, ResponseMetadata()
 
     async def get_point_cloud(
         self, *, extra=None, timeout: Optional[float] = None, **kwargs
     ) -> tuple[bytes, str]:
         self._ensure_producer()
-        pcd, _jpeg = await self._wait_for_frame(timeout)
+        pcd, _color, _depth = await self._wait_for_frame(timeout)
         return pcd, CameraMimeType.PCD
 
     async def get_properties(self, *, timeout=None, **kwargs) -> Camera.Properties:

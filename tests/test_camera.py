@@ -9,6 +9,7 @@ import numpy as np
 import pytest
 
 from src.depth.backproject import depth_to_points, intrinsics_from_fov, resolve_intrinsics
+from src.depth.colormap import depth_to_color_rgb
 from src.depth.scale_estimator import ScaleEstimator, ScaleEstimatorConfig
 from src.depth.yolo_depth import (
     ensure_ncnn_model,
@@ -50,6 +51,18 @@ def test_depth_to_points_scale_and_filters():
         depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=1.0, stride=1, min_depth_m=5.0, max_depth_m=10.0
     )
     assert empty.shape[0] == 0
+
+
+def test_depth_to_color_rgb_shape_and_invalid():
+    depth = np.full((8, 10), 2.0, dtype=np.float32)
+    depth[0, 0] = np.nan
+    depth[1, 1] = 100.0  # out of range
+    rgb = depth_to_color_rgb(depth, scale=1.0, min_depth_m=0.5, max_depth_m=5.0)
+    assert rgb.shape == (8, 10, 3)
+    assert rgb.dtype == np.uint8
+    assert tuple(rgb[0, 0]) == (0, 0, 0)
+    assert tuple(rgb[1, 1]) == (0, 0, 0)
+    assert tuple(rgb[4, 4]) != (0, 0, 0)
 
 
 def test_resolve_backend_auto_ncnn():
@@ -171,13 +184,15 @@ async def test_mono_depth_publishes_pcd_and_shm():
         assert len(pcd) > 100
         assert cam._last_points > 0
         images, _meta = await cam.get_images(timeout=1.0)
-        assert len(images) == 1
-        assert images[0].name == "color"
-        assert images[0].mime_type == "image/jpeg"
-        assert images[0].data[:2] == b"\xff\xd8"
-        filtered, _ = await cam.get_images(filter_source_names=["color"], timeout=1.0)
-        assert len(filtered) == 1
-        empty, _ = await cam.get_images(filter_source_names=["depth"], timeout=1.0)
+        assert {img.name for img in images} == {"color", "depth"}
+        by_name = {img.name: img for img in images}
+        assert by_name["color"].mime_type == "image/jpeg"
+        assert by_name["depth"].mime_type == "image/jpeg"
+        assert by_name["color"].data[:2] == b"\xff\xd8"
+        assert by_name["depth"].data[:2] == b"\xff\xd8"
+        filtered, _ = await cam.get_images(filter_source_names=["depth"], timeout=1.0)
+        assert len(filtered) == 1 and filtered[0].name == "depth"
+        empty, _ = await cam.get_images(filter_source_names=["other"], timeout=1.0)
         assert empty == []
         pts = pcd_util.parse_pcd(pcd)
         assert pts.shape[0] == cam._last_points
