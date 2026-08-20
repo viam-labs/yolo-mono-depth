@@ -423,7 +423,10 @@ class MonoDepth(Camera):
             "movement_sensor": self._ms_name,
             "online_scale": self._online_scale,
             "backend": est.backend if est else self._backend,
-            "model": self._model_path,
+            "model": (
+                getattr(est, "model_path", None) if est is not None else None
+            )
+            or self._model_path,
             "imgsz": self._imgsz,
             "produce_hz": self._produce_hz,
             "shm_name": self._shm_name,

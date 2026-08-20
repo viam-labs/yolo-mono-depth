@@ -41,7 +41,7 @@ Model: `viam-labs:yolo-mono-depth:camera` (`rdk:component:camera`).
 | `shm_name` | Optional POSIX shm writer (nav-stack / `viam-shared-memory-test` layout) |
 | `fx`/`fy`/`cx`/`cy` | Intrinsics; or omit and use `hfov_deg` (default `70`) |
 
-On a Raspberry Pi, export NCNN on a desktop, copy the `*_ncnn_model` dir to the Pi, and set `"backend": "ncnn"` with `"model"` pointing at that directory. Prefer NCNN over `.pt` on ARM.
+On a Raspberry Pi, set `"backend": "ncnn"`. You can omit `model` (defaults to `yolo26n-depth.pt`): the module downloads the weights if needed and **auto-exports** to `yolo26n-depth_ncnn_model/` on first load (slow once). Or export on a desktop and set `"model"` to that directory.
 
 `run.sh` installs **CPU** PyTorch on Linux `aarch64` before Ultralytics so pip does not pull CUDA/`nvidia-cudnn` wheels (useless on a Pi). If a previous install already dragged those in, remove `viam-env/` and `.installed` and let the module reinstall.
 

@@ -10,7 +10,12 @@ import pytest
 
 from src.depth.backproject import depth_to_points, intrinsics_from_fov, resolve_intrinsics
 from src.depth.scale_estimator import ScaleEstimator, ScaleEstimatorConfig
-from src.depth.yolo_depth import looks_like_ncnn, resolve_backend
+from src.depth.yolo_depth import (
+    ensure_ncnn_model,
+    looks_like_ncnn,
+    ncnn_dir_for_pt,
+    resolve_backend,
+)
 from src.util import pcd as pcd_util
 from src.util import pcshm
 from src.util import scan as scan_util
@@ -52,6 +57,38 @@ def test_resolve_backend_auto_ncnn():
     assert resolve_backend("auto", "yolo26n-depth.pt") == "pt"
     assert resolve_backend("ncnn", "/tmp/foo_ncnn_model") == "ncnn"
     assert looks_like_ncnn("foo_ncnn_model")
+
+
+def test_ensure_ncnn_reuses_existing_dir(tmp_path):
+    pt = tmp_path / "yolo26n-depth.pt"
+    pt.write_bytes(b"fake")
+    out = ncnn_dir_for_pt(pt)
+    out.mkdir()
+    (out / "model.ncnn.param").write_text("x")
+    (out / "model.ncnn.bin").write_bytes(b"y")
+    assert ensure_ncnn_model(str(pt), imgsz=416, yolo_cls=MagicMock()) == str(out.resolve())
+
+
+def test_ensure_ncnn_exports_when_missing(tmp_path):
+    pt = tmp_path / "yolo26n-depth.pt"
+    pt.write_bytes(b"fake")
+    out = ncnn_dir_for_pt(pt)
+
+    class _YOLO:
+        def __init__(self, path):
+            self.path = path
+
+        def export(self, format, imgsz):
+            assert format == "ncnn"
+            assert imgsz == 416
+            out.mkdir()
+            (out / "model.ncnn.param").write_text("p")
+            (out / "model.ncnn.bin").write_bytes(b"b")
+            return str(out)
+
+    got = ensure_ncnn_model(str(pt), imgsz=416, yolo_cls=_YOLO)
+    assert got == str(out.resolve())
+    assert looks_like_ncnn(got)
 
 
 def _wall_scan(dist: float) -> scan_util.LaserScan2D:

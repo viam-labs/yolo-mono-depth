@@ -85,6 +85,48 @@ def resolve_backend(backend: str, model: str) -> str:
     return "ncnn" if looks_like_ncnn(model) else "pt"
 
 
+def ncnn_dir_for_pt(pt_path: str | Path) -> Path:
+    """Ultralytics default export dir next to a ``.pt`` weights file."""
+    p = Path(str(pt_path)).expanduser()
+    return p.with_name(f"{p.stem}_ncnn_model")
+
+
+def ensure_ncnn_model(pt_path: str, *, imgsz: int, yolo_cls: Any = None) -> str:
+    """Return an NCNN model directory, exporting from ``pt_path`` if needed.
+
+    Reuses ``{stem}_ncnn_model`` beside the weights when present. First export on a
+    Pi can take several minutes (download ``.pt`` + convert).
+    """
+    pt = Path(str(pt_path)).expanduser()
+    out = ncnn_dir_for_pt(pt)
+    if looks_like_ncnn(str(out)):
+        return str(out.resolve() if out.exists() else out)
+
+    if yolo_cls is None:
+        from ultralytics import YOLO as yolo_cls  # type: ignore
+
+    try:
+        model = yolo_cls(str(pt))
+        exported = model.export(format="ncnn", imgsz=int(imgsz))
+    except Exception as exc:  # pragma: no cover - ultralytics errors vary
+        raise YoloDepthError(
+            f"failed to export {pt!s} to NCNN (imgsz={imgsz}): {exc}"
+        ) from exc
+
+    # Ultralytics may return a path string or Path to the export dir / zip.
+    candidate = Path(str(exported)).expanduser() if exported else out
+    if candidate.is_file() and candidate.suffix == ".zip":
+        candidate = candidate.with_suffix("")
+    if looks_like_ncnn(str(candidate)):
+        return str(candidate.resolve() if candidate.exists() else candidate)
+    if looks_like_ncnn(str(out)):
+        return str(out.resolve() if out.exists() else out)
+    raise YoloDepthError(
+        f"NCNN export of {pt!s} did not produce a usable model dir "
+        f"(tried {candidate!s} and {out!s})"
+    )
+
+
 class YoloDepthEstimator:
     """Thin wrapper: RGB ndarray ``(H,W,3)`` uint8 → depth meters ``(H,W)``."""
 
@@ -115,12 +157,15 @@ class YoloDepthEstimator:
             ) from exc
         path = self.model_path
         if self.backend == "ncnn" and not looks_like_ncnn(path):
-            # Explicit ncnn backend with a .pt path: load then expect caller to
-            # have exported; fail clearly rather than silent .pt on Pi.
+            # ``backend=ncnn`` with a ``.pt`` (including the default model name):
+            # export once beside the weights, then load the NCNN directory.
             if path.endswith(".pt") and not os.path.isdir(path):
+                path = ensure_ncnn_model(path, imgsz=self.imgsz, yolo_cls=YOLO)
+                self.model_path = path
+            else:
                 raise YoloDepthError(
-                    f"backend=ncnn requires an NCNN model directory, got {path!r}. "
-                    "Export with: YOLO('yolo26n-depth.pt').export(format='ncnn', imgsz=...)"
+                    f"backend=ncnn requires an NCNN model directory or .pt weights, "
+                    f"got {path!r}"
                 )
         self._model = YOLO(path)
         self._model.overrides["task"] = "depth"
