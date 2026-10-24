@@ -5,6 +5,7 @@ Ultralytics YOLO26 depth (``.pt`` or NCNN), backprojects to a point cloud, and
 exposes it as a lidar-compatible ``rdk:component:camera``. Optional
 ``movement_sensor`` enables online scale from wheel odometry vs scan-match.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -15,7 +16,6 @@ from typing import ClassVar, Mapping, Optional, Sequence
 
 import numpy as np
 from typing_extensions import Self
-
 from viam.components.camera import Camera
 from viam.components.movement_sensor import MovementSensor
 from viam.logging import getLogger
@@ -30,8 +30,8 @@ from .depth.backproject import depth_to_points, resolve_intrinsics
 from .depth.colormap import depth_to_color_rgb
 from .depth.scale_estimator import ScaleEstimator, ScaleEstimatorConfig
 from .depth.yolo_depth import YoloDepthEstimator
-from .util import pcshm
 from .util import pcd as pcd_util
+from .util import pcshm
 from .util import scan as scan_util
 from .util.odom import TypedMovementSensorOdom, TypedOdomConfig
 
@@ -74,7 +74,9 @@ DEPTH_SOURCE_NAME = "depth"
 
 
 class MonoDepth(Camera):
-    MODEL: ClassVar[Model] = Model(ModelFamily("viam-labs", "yolo-mono-depth"), "camera")
+    MODEL: ClassVar[Model] = Model(
+        ModelFamily("viam-labs", "yolo-mono-depth"), "camera"
+    )
 
     def __init__(self, name: str):
         super().__init__(name)
@@ -164,7 +166,9 @@ class MonoDepth(Camera):
         if ms_name:
             ms = dependencies.get(MovementSensor.get_resource_name(ms_name))
             if ms is None:
-                raise RuntimeError(f"yolo-mono-depth movement_sensor {ms_name!r} missing")
+                raise RuntimeError(
+                    f"yolo-mono-depth movement_sensor {ms_name!r} missing"
+                )
             self._ms = ms  # type: ignore[assignment]
             self._odom = TypedMovementSensorOdom(
                 self._ms,
@@ -311,7 +315,9 @@ class MonoDepth(Camera):
         images, _meta = await source.get_images(timeout=self._timeout_s)
         grab_ms = (time.monotonic() - grab_t0) * 1000.0
         if not images:
-            raise RuntimeError(f"source camera {self._source_name!r} returned no images")
+            raise RuntimeError(
+                f"source camera {self._source_name!r} returned no images"
+            )
         if self._stop.is_set():
             return
         decode_t0 = time.monotonic()
@@ -438,12 +444,18 @@ class MonoDepth(Camera):
         _pcd, color_jpeg, depth_jpeg = await self._wait_for_frame(timeout)
         want = None
         if filter_source_names:
-            want = {str(n).strip().lower() for n in filter_source_names if str(n).strip()}
+            want = {
+                str(n).strip().lower() for n in filter_source_names if str(n).strip()
+            }
         images: list[NamedImage] = []
         if want is None or COLOR_SOURCE_NAME in want or "rgb" in want:
-            images.append(NamedImage(COLOR_SOURCE_NAME, color_jpeg, CameraMimeType.JPEG))
+            images.append(
+                NamedImage(COLOR_SOURCE_NAME, color_jpeg, CameraMimeType.JPEG)
+            )
         if want is None or DEPTH_SOURCE_NAME in want:
-            images.append(NamedImage(DEPTH_SOURCE_NAME, depth_jpeg, CameraMimeType.JPEG))
+            images.append(
+                NamedImage(DEPTH_SOURCE_NAME, depth_jpeg, CameraMimeType.JPEG)
+            )
         return images, ResponseMetadata()
 
     async def get_point_cloud(
@@ -460,7 +472,11 @@ class MonoDepth(Camera):
         )
 
     async def do_command(
-        self, command: Mapping[str, object], *, timeout: Optional[float] = None, **kwargs
+        self,
+        command: Mapping[str, object],
+        *,
+        timeout: Optional[float] = None,
+        **kwargs,
     ) -> Mapping[str, object]:
         self._ensure_producer()
         cmd = command.get("command") if isinstance(command, Mapping) else None
@@ -480,9 +496,7 @@ class MonoDepth(Camera):
             "movement_sensor": self._ms_name,
             "online_scale": self._online_scale,
             "backend": est.backend if est else self._backend,
-            "model": (
-                getattr(est, "model_path", None) if est is not None else None
-            )
+            "model": (getattr(est, "model_path", None) if est is not None else None)
             or self._model_path,
             "imgsz": self._imgsz,
             "produce_hz": self._produce_hz,

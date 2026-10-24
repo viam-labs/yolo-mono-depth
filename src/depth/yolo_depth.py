@@ -23,6 +23,7 @@ def _ensure_lzma_importable() -> None:
     """
     try:
         import lzma  # noqa: F401
+
         return
     except ModuleNotFoundError:
         pass

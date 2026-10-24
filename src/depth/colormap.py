@@ -26,7 +26,9 @@ def _build_lut() -> np.ndarray:
     t = np.linspace(0.0, 1.0, 256)
     lut = np.empty((256, 3), dtype=np.uint8)
     for c in range(3):
-        lut[:, c] = np.clip(np.interp(t, xs, _TURBO_STOPS[:, c]), 0, 255).astype(np.uint8)
+        lut[:, c] = np.clip(np.interp(t, xs, _TURBO_STOPS[:, c]), 0, 255).astype(
+            np.uint8
+        )
     return lut
 
 
