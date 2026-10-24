@@ -16,7 +16,6 @@ from typing import ClassVar, Mapping, Optional, Sequence
 
 import numpy as np
 from typing_extensions import Self
-
 from viam.components.camera import Camera
 from viam.components.movement_sensor import MovementSensor
 from viam.logging import getLogger
@@ -31,8 +30,8 @@ from .depth.backproject import depth_to_points, resolve_intrinsics
 from .depth.colormap import depth_to_color_rgb
 from .depth.scale_estimator import ScaleEstimator, ScaleEstimatorConfig
 from .depth.yolo_depth import YoloDepthEstimator
-from .util import pcshm
 from .util import pcd as pcd_util
+from .util import pcshm
 from .util import scan as scan_util
 from .util.odom import TypedMovementSensorOdom, TypedOdomConfig
 
