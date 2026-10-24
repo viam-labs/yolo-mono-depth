@@ -129,8 +129,12 @@ def estimate_forward_range_flow(
     if prev_r.size < 20 or curr_r.size < 20:
         return None
 
-    prev_angles = prev.angle_min + np.arange(prev_r.size, dtype=float) * prev.angle_increment
-    curr_angles = curr.angle_min + np.arange(curr_r.size, dtype=float) * curr.angle_increment
+    prev_angles = (
+        prev.angle_min + np.arange(prev_r.size, dtype=float) * prev.angle_increment
+    )
+    curr_angles = (
+        curr.angle_min + np.arange(curr_r.size, dtype=float) * curr.angle_increment
+    )
     valid_prev = (
         np.isfinite(prev_r)
         & (prev_r >= float(prev.range_min))
