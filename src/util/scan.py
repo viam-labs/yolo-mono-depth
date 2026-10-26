@@ -94,9 +94,7 @@ def pointcloud_to_scan(
     return points_to_scan(xy, **scan_kwargs)
 
 
-def _interpolate_range_at_angle(
-    angles: np.ndarray, ranges: np.ndarray, angle: float
-) -> Optional[float]:
+def _interpolate_range_at_angle(angles: np.ndarray, ranges: np.ndarray, angle: float) -> Optional[float]:
     if angles.size == 0:
         return None
     wrapped = ((angles + math.pi) % (2 * math.pi)) - math.pi
@@ -131,16 +129,8 @@ def estimate_forward_range_flow(
 
     prev_angles = prev.angle_min + np.arange(prev_r.size, dtype=float) * prev.angle_increment
     curr_angles = curr.angle_min + np.arange(curr_r.size, dtype=float) * curr.angle_increment
-    valid_prev = (
-        np.isfinite(prev_r)
-        & (prev_r >= float(prev.range_min))
-        & (prev_r <= float(prev.range_max))
-    )
-    valid_curr = (
-        np.isfinite(curr_r)
-        & (curr_r >= float(curr.range_min))
-        & (curr_r <= float(curr.range_max))
-    )
+    valid_prev = np.isfinite(prev_r) & (prev_r >= float(prev.range_min)) & (prev_r <= float(prev.range_max))
+    valid_curr = np.isfinite(curr_r) & (curr_r >= float(curr.range_min)) & (curr_r <= float(curr.range_max))
     curr_angles_v = curr_angles[valid_curr]
     curr_r_v = curr_r[valid_curr]
     if curr_angles_v.size < 20:

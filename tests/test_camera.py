@@ -43,13 +43,9 @@ def test_depth_to_points_forward_plane():
 def test_depth_to_points_scale_and_filters():
     depth = np.full((10, 10), 1.0, dtype=np.float32)
     fx, fy, cx, cy = 100.0, 100.0, 4.5, 4.5
-    pts = depth_to_points(
-        depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=2.0, stride=1, min_depth_m=0.5, max_depth_m=3.0
-    )
+    pts = depth_to_points(depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=2.0, stride=1, min_depth_m=0.5, max_depth_m=3.0)
     assert float(np.median(pts[:, 0])) == pytest.approx(2.0, abs=0.05)
-    empty = depth_to_points(
-        depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=1.0, stride=1, min_depth_m=5.0, max_depth_m=10.0
-    )
+    empty = depth_to_points(depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=1.0, stride=1, min_depth_m=5.0, max_depth_m=10.0)
     assert empty.shape[0] == 0
 
 
