@@ -63,9 +63,7 @@ def _rgb_to_jpeg(rgb: np.ndarray, *, quality: int = 85) -> bytes:
     from PIL import Image
 
     buf = io.BytesIO()
-    Image.fromarray(np.asarray(rgb, dtype=np.uint8), mode="RGB").save(
-        buf, format="JPEG", quality=int(quality)
-    )
+    Image.fromarray(np.asarray(rgb, dtype=np.uint8), mode="RGB").save(buf, format="JPEG", quality=int(quality))
     return buf.getvalue()
 
 
@@ -74,9 +72,7 @@ DEPTH_SOURCE_NAME = "depth"
 
 
 class MonoDepth(Camera):
-    MODEL: ClassVar[Model] = Model(
-        ModelFamily("viam-labs", "yolo-mono-depth"), "camera"
-    )
+    MODEL: ClassVar[Model] = Model(ModelFamily("viam-labs", "yolo-mono-depth"), "camera")
 
     def __init__(self, name: str):
         super().__init__(name)
@@ -125,17 +121,13 @@ class MonoDepth(Camera):
         self._last_odom_wall: Optional[float] = None
 
     @classmethod
-    def new(
-        cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
-    ) -> Self:
+    def new(cls, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]) -> Self:
         cam = cls(config.name)
         cam.reconfigure(config, dependencies)
         return cam
 
     @classmethod
-    def validate_config(
-        cls, config: ComponentConfig
-    ) -> tuple[Sequence[str], Sequence[str]]:
+    def validate_config(cls, config: ComponentConfig) -> tuple[Sequence[str], Sequence[str]]:
         attrs = struct_to_dict(config.attributes)
         source = str(attrs.get("source") or attrs.get("camera") or "").strip()
         if not source:
@@ -146,9 +138,7 @@ class MonoDepth(Camera):
             optional.append(ms)
         return [source], optional
 
-    def reconfigure(
-        self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]
-    ) -> None:
+    def reconfigure(self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]) -> None:
         self.close_sync()
         attrs = struct_to_dict(config.attributes)
         source_name = str(attrs.get("source") or attrs.get("camera") or "").strip()
@@ -166,9 +156,7 @@ class MonoDepth(Camera):
         if ms_name:
             ms = dependencies.get(MovementSensor.get_resource_name(ms_name))
             if ms is None:
-                raise RuntimeError(
-                    f"yolo-mono-depth movement_sensor {ms_name!r} missing"
-                )
+                raise RuntimeError(f"yolo-mono-depth movement_sensor {ms_name!r} missing")
             self._ms = ms  # type: ignore[assignment]
             self._odom = TypedMovementSensorOdom(
                 self._ms,
@@ -250,9 +238,7 @@ class MonoDepth(Camera):
         except RuntimeError:
             return
         self._module_loop = loop
-        self._produce_task = loop.create_task(
-            self._produce_loop_async(), name=f"{self.name}-yolo-mono-depth"
-        )
+        self._produce_task = loop.create_task(self._produce_loop_async(), name=f"{self.name}-yolo-mono-depth")
 
     def _ensure_producer(self) -> None:
         self._start_producer_if_possible()
@@ -315,9 +301,7 @@ class MonoDepth(Camera):
         images, _meta = await source.get_images(timeout=self._timeout_s)
         grab_ms = (time.monotonic() - grab_t0) * 1000.0
         if not images:
-            raise RuntimeError(
-                f"source camera {self._source_name!r} returned no images"
-            )
+            raise RuntimeError(f"source camera {self._source_name!r} returned no images")
         if self._stop.is_set():
             return
         decode_t0 = time.monotonic()
@@ -389,9 +373,7 @@ class MonoDepth(Camera):
             if dt > 1e-3:
                 inst_hz = 1.0 / dt
                 prev = self._measured_hz
-                self._measured_hz = (
-                    inst_hz if prev is None else (0.7 * prev + 0.3 * inst_hz)
-                )
+                self._measured_hz = inst_hz if prev is None else (0.7 * prev + 0.3 * inst_hz)
         with self._lock:
             self._latest = pcd
             self._latest_jpeg = color_jpeg
@@ -406,9 +388,7 @@ class MonoDepth(Camera):
         self._last_publish_wall = now
         self._last_error = None
 
-    async def _wait_for_frame(
-        self, timeout: Optional[float]
-    ) -> tuple[bytes, bytes, bytes]:
+    async def _wait_for_frame(self, timeout: Optional[float]) -> tuple[bytes, bytes, bytes]:
         """Return ``(pcd, color_jpeg, depth_jpeg)`` once a frame is available."""
         wait_s = float(timeout) if timeout is not None else self._timeout_s
         deadline = time.monotonic() + wait_s
@@ -444,23 +424,15 @@ class MonoDepth(Camera):
         _pcd, color_jpeg, depth_jpeg = await self._wait_for_frame(timeout)
         want = None
         if filter_source_names:
-            want = {
-                str(n).strip().lower() for n in filter_source_names if str(n).strip()
-            }
+            want = {str(n).strip().lower() for n in filter_source_names if str(n).strip()}
         images: list[NamedImage] = []
         if want is None or COLOR_SOURCE_NAME in want or "rgb" in want:
-            images.append(
-                NamedImage(COLOR_SOURCE_NAME, color_jpeg, CameraMimeType.JPEG)
-            )
+            images.append(NamedImage(COLOR_SOURCE_NAME, color_jpeg, CameraMimeType.JPEG))
         if want is None or DEPTH_SOURCE_NAME in want:
-            images.append(
-                NamedImage(DEPTH_SOURCE_NAME, depth_jpeg, CameraMimeType.JPEG)
-            )
+            images.append(NamedImage(DEPTH_SOURCE_NAME, depth_jpeg, CameraMimeType.JPEG))
         return images, ResponseMetadata()
 
-    async def get_point_cloud(
-        self, *, extra=None, timeout: Optional[float] = None, **kwargs
-    ) -> tuple[bytes, str]:
+    async def get_point_cloud(self, *, extra=None, timeout: Optional[float] = None, **kwargs) -> tuple[bytes, str]:
         self._ensure_producer()
         pcd, _color, _depth = await self._wait_for_frame(timeout)
         return pcd, CameraMimeType.PCD
@@ -472,19 +444,13 @@ class MonoDepth(Camera):
         )
 
     async def do_command(
-        self,
-        command: Mapping[str, object],
-        *,
-        timeout: Optional[float] = None,
-        **kwargs,
+        self, command: Mapping[str, object], *, timeout: Optional[float] = None, **kwargs
     ) -> Mapping[str, object]:
         self._ensure_producer()
         cmd = command.get("command") if isinstance(command, Mapping) else None
         if cmd == "set_scale":
             s = float(command.get("scale", self._scale_est.scale))
-            self._scale_est.scale = float(
-                np.clip(s, self._scale_est.cfg.scale_min, self._scale_est.cfg.scale_max)
-            )
+            self._scale_est.scale = float(np.clip(s, self._scale_est.cfg.scale_min, self._scale_est.cfg.scale_max))
             self._scale_est.reset_window()
             return {"scale": self._scale_est.scale}
         last_age = None
@@ -496,8 +462,7 @@ class MonoDepth(Camera):
             "movement_sensor": self._ms_name,
             "online_scale": self._online_scale,
             "backend": est.backend if est else self._backend,
-            "model": (getattr(est, "model_path", None) if est is not None else None)
-            or self._model_path,
+            "model": (getattr(est, "model_path", None) if est is not None else None) or self._model_path,
             "imgsz": self._imgsz,
             "produce_hz": self._produce_hz,
             "shm_name": self._shm_name,
@@ -508,18 +473,12 @@ class MonoDepth(Camera):
             "last_grab_ms": self._last_grab_ms,
             "last_decode_ms": self._last_decode_ms,
             "last_cycle_ms": self._last_cycle_ms,
-            "measured_hz": (
-                None if self._measured_hz is None else round(self._measured_hz, 2)
-            ),
+            "measured_hz": (None if self._measured_hz is None else round(self._measured_hz, 2)),
             "last_publish_age_s": last_age,
             "last_error": self._last_error,
             "latest_bytes": len(self._latest),
             "scale": self._scale_est.status(),
-            "producer": (
-                "running"
-                if self._produce_task is not None and not self._produce_task.done()
-                else "stopped"
-            ),
+            "producer": ("running" if self._produce_task is not None and not self._produce_task.done() else "stopped"),
         }
 
     def close_sync(self) -> None:

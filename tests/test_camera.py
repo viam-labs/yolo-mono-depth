@@ -8,11 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import numpy as np
 import pytest
 
-from src.depth.backproject import (
-    depth_to_points,
-    intrinsics_from_fov,
-    resolve_intrinsics,
-)
+from src.depth.backproject import depth_to_points, intrinsics_from_fov, resolve_intrinsics
 from src.depth.colormap import depth_to_color_rgb
 from src.depth.scale_estimator import ScaleEstimator, ScaleEstimatorConfig
 from src.depth.yolo_depth import (
@@ -47,29 +43,9 @@ def test_depth_to_points_forward_plane():
 def test_depth_to_points_scale_and_filters():
     depth = np.full((10, 10), 1.0, dtype=np.float32)
     fx, fy, cx, cy = 100.0, 100.0, 4.5, 4.5
-    pts = depth_to_points(
-        depth,
-        fx=fx,
-        fy=fy,
-        cx=cx,
-        cy=cy,
-        scale=2.0,
-        stride=1,
-        min_depth_m=0.5,
-        max_depth_m=3.0,
-    )
+    pts = depth_to_points(depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=2.0, stride=1, min_depth_m=0.5, max_depth_m=3.0)
     assert float(np.median(pts[:, 0])) == pytest.approx(2.0, abs=0.05)
-    empty = depth_to_points(
-        depth,
-        fx=fx,
-        fy=fy,
-        cx=cx,
-        cy=cy,
-        scale=1.0,
-        stride=1,
-        min_depth_m=5.0,
-        max_depth_m=10.0,
-    )
+    empty = depth_to_points(depth, fx=fx, fy=fy, cx=cx, cy=cy, scale=1.0, stride=1, min_depth_m=5.0, max_depth_m=10.0)
     assert empty.shape[0] == 0
 
 
@@ -99,9 +75,7 @@ def test_ensure_ncnn_reuses_existing_dir(tmp_path):
     out.mkdir()
     (out / "model.ncnn.param").write_text("x")
     (out / "model.ncnn.bin").write_bytes(b"y")
-    assert ensure_ncnn_model(str(pt), imgsz=416, yolo_cls=MagicMock()) == str(
-        out.resolve()
-    )
+    assert ensure_ncnn_model(str(pt), imgsz=416, yolo_cls=MagicMock()) == str(out.resolve())
 
 
 def test_ensure_ncnn_exports_when_missing(tmp_path):
@@ -141,17 +115,13 @@ def _wall_scan(dist: float) -> scan_util.LaserScan2D:
 def test_scale_estimator_converges():
     est = ScaleEstimator(
         scale=1.0,
-        cfg=ScaleEstimatorConfig(
-            ema=1.0, min_translation_m=0.1, min_match_fraction=0.05
-        ),
+        cfg=ScaleEstimatorConfig(ema=1.0, min_translation_m=0.1, min_match_fraction=0.05),
     )
     est.note_wheel_twist(True)
 
     prev = _wall_scan(3.0)
     curr = _wall_scan(2.0)
-    motion = scan_util.estimate_forward_range_flow(
-        prev, curr, dtheta=0.0, min_abs_dx=0.05
-    )
+    motion = scan_util.estimate_forward_range_flow(prev, curr, dtheta=0.0, min_abs_dx=0.05)
     assert motion is not None
     assert motion.dx == pytest.approx(1.0, abs=0.15)
 

@@ -116,9 +116,7 @@ def ensure_ncnn_model(pt_path: str, *, imgsz: int, yolo_cls: Any = None) -> str:
         model = yolo_cls(str(pt))
         exported = model.export(format="ncnn", imgsz=int(imgsz))
     except Exception as exc:  # pragma: no cover - ultralytics errors vary
-        raise YoloDepthError(
-            f"failed to export {pt!s} to NCNN (imgsz={imgsz}): {exc}"
-        ) from exc
+        raise YoloDepthError(f"failed to export {pt!s} to NCNN (imgsz={imgsz}): {exc}") from exc
 
     # Ultralytics may return a path string or Path to the export dir / zip.
     candidate = Path(str(exported)).expanduser() if exported else out
@@ -127,10 +125,7 @@ def ensure_ncnn_model(pt_path: str, *, imgsz: int, yolo_cls: Any = None) -> str:
     for path in (candidate, out):
         if ncnn_export_ready(path):
             return str(path.resolve())
-    raise YoloDepthError(
-        f"NCNN export of {pt!s} did not produce a usable model dir "
-        f"(tried {candidate!s} and {out!s})"
-    )
+    raise YoloDepthError(f"NCNN export of {pt!s} did not produce a usable model dir (tried {candidate!s} and {out!s})")
 
 
 class YoloDepthEstimator:
@@ -158,8 +153,7 @@ class YoloDepthEstimator:
             from ultralytics import YOLO
         except ImportError as exc:  # pragma: no cover - optional dep
             raise YoloDepthError(
-                "ultralytics is required for yolo-mono-depth; "
-                "install with: pip install ultralytics"
+                "ultralytics is required for yolo-mono-depth; install with: pip install ultralytics"
             ) from exc
         path = self.model_path
         if self.backend == "ncnn" and not looks_like_ncnn(path):
@@ -169,10 +163,7 @@ class YoloDepthEstimator:
                 path = ensure_ncnn_model(path, imgsz=self.imgsz, yolo_cls=YOLO)
                 self.model_path = path
             else:
-                raise YoloDepthError(
-                    f"backend=ncnn requires an NCNN model directory or .pt weights, "
-                    f"got {path!r}"
-                )
+                raise YoloDepthError(f"backend=ncnn requires an NCNN model directory or .pt weights, got {path!r}")
         self._model = YOLO(path)
         self._model.overrides["task"] = "depth"
 
@@ -191,9 +182,7 @@ class YoloDepthEstimator:
         result = results[0]
         depth_obj = getattr(result, "depth", None)
         if depth_obj is None:
-            raise YoloDepthError(
-                "YOLO result has no .depth — is this a *-depth model / task=depth?"
-            )
+            raise YoloDepthError("YOLO result has no .depth — is this a *-depth model / task=depth?")
         data = depth_obj.data
         if hasattr(data, "cpu"):
             data = data.cpu().numpy()

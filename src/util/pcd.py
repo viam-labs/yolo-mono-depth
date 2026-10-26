@@ -99,6 +99,4 @@ def parse_pcd(raw: bytes) -> np.ndarray:
     structured = np.frombuffer(body[: npoints * record.itemsize], dtype=record)
     if not {"x", "y", "z"} <= set(structured.dtype.names or ()):
         return np.empty((0, 3))
-    return np.stack([structured["x"], structured["y"], structured["z"]], axis=1).astype(
-        float
-    )
+    return np.stack([structured["x"], structured["y"], structured["z"]], axis=1).astype(float)

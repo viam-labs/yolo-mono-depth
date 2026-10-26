@@ -96,30 +96,18 @@ class ScaleEstimator:
         if abs(odom_dx) < cfg.min_translation_m:
             self.last_reason = "odom_translation_small"
             self.last_odom_dx = odom_dx
-            return ScaleUpdate(
-                False, self.scale, odom_dx=odom_dx, reason=self.last_reason
-            )
+            return ScaleUpdate(False, self.scale, odom_dx=odom_dx, reason=self.last_reason)
 
-        motion = scan_util.estimate_forward_range_flow(
-            prev, scan, dtheta=0.0, min_abs_dx=0.02
-        )
+        motion = scan_util.estimate_forward_range_flow(prev, scan, dtheta=0.0, min_abs_dx=0.02)
         if motion is None or motion.match_fraction < cfg.min_match_fraction:
             self.last_reason = "scan_match_weak"
             self.last_odom_dx = odom_dx
-            return ScaleUpdate(
-                False, self.scale, odom_dx=odom_dx, reason=self.last_reason
-            )
+            return ScaleUpdate(False, self.scale, odom_dx=odom_dx, reason=self.last_reason)
 
         depth_dx = float(motion.dx)
         if abs(depth_dx) < 0.02:
             self.last_reason = "depth_dx_small"
-            return ScaleUpdate(
-                False,
-                self.scale,
-                odom_dx=odom_dx,
-                depth_dx=depth_dx,
-                reason=self.last_reason,
-            )
+            return ScaleUpdate(False, self.scale, odom_dx=odom_dx, depth_dx=depth_dx, reason=self.last_reason)
 
         ratio = odom_dx / depth_dx
         if ratio <= 0:
@@ -155,9 +143,7 @@ class ScaleEstimator:
         return {
             "scale": round(self.scale, 4),
             "updates": self.updates,
-            "last_ratio": None
-            if self.last_ratio is None
-            else round(self.last_ratio, 4),
+            "last_ratio": None if self.last_ratio is None else round(self.last_ratio, 4),
             "last_odom_dx": round(self.last_odom_dx, 4),
             "last_depth_dx": round(self.last_depth_dx, 4),
             "last_reason": self.last_reason,
